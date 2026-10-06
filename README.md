@@ -1,39 +1,43 @@
-# Credit Card Reminder PWA
+# ShipIt v0.3
 
-A mobile-first credit card bill tracker built with Node.js + Express + HTML/CSS/JavaScript.
+**ZIP -> create GitHub repository -> push branch -> Vercel-ready deployment**
 
-## Current version
+## Environment
 
-- Browser `localStorage` is the database.
-- No card numbers beyond last 4 digits should be stored.
-- Add/edit/delete credit cards.
-- Create billing cycles / statements.
-- Mark bills paid.
-- Dashboard with swipeable card tiles.
-- Upcoming payment view.
-- Browser notification support when available.
-- PWA manifest + service worker.
-- Responsive mobile UI.
+ShipIt requires only:
+
+```env
+GITHUB_TOKEN=github_pat_...
+```
+
+The authenticated GitHub account is discovered with GitHub's `/user` API. The token is never accepted from or returned to the browser.
+
+For automatic repository creation, the GitHub credential must have permission to create repositories under the authenticated account. For a fine-grained token, enable the repository administration permission required by the account/token policy, plus Contents read/write for Git operations.
+
+## User inputs
+
+The UI asks for:
+- Project ZIP
+- Vercel project/deployment name
+- GitHub repository name
+- Branch (defaults to `main`)
+- Commit message
+
+ShipIt creates the repository under the authenticated GitHub account, then pushes the project to the requested branch.
+
+## Vercel
+
+This version intentionally uses **no Vercel environment variable**. After the GitHub repository is created/pushed, Vercel should deploy it through your existing GitHub/Vercel integration. The requested project name is included in the repository description and returned as the deployment project name.
+
+Programmatically creating a brand-new Vercel project requires Vercel authorization. The next version should use OAuth/GitHub/Vercel App authorization rather than introducing another long-lived environment secret.
 
 ## Run
 
 ```bash
 npm install
+cp .env.example .env
+# put your token in .env
 npm start
 ```
 
-Open:
-
-```text
-http://localhost:3000
-```
-
-For Android installation and reliable browser notifications, serve the app over HTTPS when deployed. `localhost` is treated as a secure context for development.
-
-## Important
-
-The current notification implementation is intentionally local/browser based. A production push-notification system will require a push service/backend and is a later phase.
-
-## Data
-
-All application data is stored in the browser's localStorage. Clearing site data will remove the stored cards and bills. A backup/export feature should be added before relying on this for important records.
+Open `http://localhost:3000`.

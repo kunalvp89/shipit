@@ -1,20 +1,27 @@
-const express = require("express");
-const path = require("path");
-
-const app = express();
-const PORT = process.env.PORT || 3000;
-
-app.use(express.json());
-app.use(express.static(path.join(__dirname, "public")));
-
-app.get("/api/health", (_req, res) => {
-  res.json({ ok: true, app: "credit-card-reminder-pwa" });
-});
-
-app.get("*splat", (_req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
-});
-
-app.listen(PORT, () => {
-  console.log(`Credit Card Reminder PWA running at http://localhost:${PORT}`);
-});
+require('dotenv').config();
+const express=require('express');
+const multer=require('multer');
+const AdmZip=require('adm-zip');
+const path=require('path');
+const crypto=require('crypto');
+const app=express();
+const PORT=Number(process.env.PORT||3000), MAX_UPLOAD_MB=25, MAX_FILES=500, MAX_FILE_SIZE_MB=5;
+const upload=multer({storage:multer.memoryStorage(),limits:{fileSize:MAX_UPLOAD_MB*1024*1024}});
+app.use(express.json()); app.use(express.static(path.join(__dirname,'public')));
+function requireToken(){if(!process.env.GITHUB_TOKEN)throw new Error('GITHUB_TOKEN is not configured in the server environment.');}
+function headers(){return {Accept:'application/vnd.github+json',Authorization:`Bearer ${process.env.GITHUB_TOKEN}`,'X-GitHub-Api-Version':'2022-11-28','User-Agent':'ShipIt/0.3.0'};}
+async function gh(endpoint,options={}){const r=await fetch(`https://api.github.com${endpoint}`,{...options,headers:{...headers(),...(options.headers||{})}});const t=await r.text();let d={};try{d=t?JSON.parse(t):{};}catch{d={message:t}}if(!r.ok){const e=new Error(d.message||`GitHub API error ${r.status}`);e.status=r.status;throw e;}return d;}
+async function user(){return gh('/user');}
+function zipPath(s){const n=s.replaceAll('\\','/').replace(/^\/+/,''),p=n.split('/').filter(Boolean);if(!p.length||p.includes('..')||p.some(x=>x==='.')||n.includes('\0'))throw new Error(`Unsafe ZIP path: ${s}`);return p.join('/');}
+function skip(p){const l=p.toLowerCase();return l==='.env'||l.startsWith('.env.')||l.startsWith('.git/')||l.startsWith('node_modules/')||l.startsWith('.next/')||l.startsWith('dist/')||l.startsWith('build/')||['.ds_store','thumbs.db','npm-debug.log','yarn-error.log','pnpm-debug.log'].includes(l.split('/').pop());}
+function extract(buf){const z=new AdmZip(buf),e=z.getEntries();if(!e.length)throw new Error('The ZIP file is empty.');const out=[];for(const x of e){if(x.isDirectory)continue;const p=zipPath(x.entryName);if(skip(p))continue;const c=x.getData();if(c.length>MAX_FILE_SIZE_MB*1024*1024)throw new Error(`File "${p}" exceeds ${MAX_FILE_SIZE_MB} MB.`);out.push({path:p,content:c,size:c.length});if(out.length>MAX_FILES)throw new Error(`Project contains more than ${MAX_FILES} files.`);}if(!out.length)throw new Error('No deployable files were found.');return out;}
+function name(s,label){if(!s||!/^[A-Za-z0-9][A-Za-z0-9_.-]{0,99}$/.test(s))throw new Error(`Invalid ${label}.`);}
+function branch(s){if(!s||s.length>250||s.startsWith('-')||s.includes('..')||s.includes(' ')||/[\u0000-\u001f~^:?*\\[\]]/.test(s))throw new Error('Invalid Git branch name.');}
+async function createRepo(repo,project){return gh('/user/repos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:repo,description:`Managed by ShipIt · Vercel project: ${project}`,private:true,auto_init:true})});}
+async function ref(owner,repo,b){return gh(`/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/ref/heads/${encodeURIComponent(b)}`);}
+async function ensureBranch(owner,repo,b){try{return await ref(owner,repo,b)}catch(e){const r=await gh(`/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`),src=await ref(owner,repo,r.default_branch);if(b===r.default_branch)throw e;return gh(`/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/refs`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ref:`refs/heads/${b}`,sha:src.object.sha})});}}
+async function ship({files,owner,repo,b,message}){const r=await ensureBranch(owner,repo,b),parent=r.object.sha,pc=await gh(`/repos/${owner}/${repo}/git/commits/${parent}`);const blobs=[];for(const f of files)blobs.push(await gh(`/repos/${owner}/${repo}/git/blobs`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({content:f.content.toString('base64'),encoding:'base64'})}));const tree=await gh(`/repos/${owner}/${repo}/git/trees`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({base_tree:pc.tree.sha,tree:files.map((f,i)=>({path:f.path,mode:'100644',type:'blob',sha:blobs[i].sha}))})});const c=await gh(`/repos/${owner}/${repo}/git/commits`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message,tree:tree.sha,parents:[parent]})});await gh(`/repos/${owner}/${repo}/git/refs/heads/${encodeURIComponent(b)}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({sha:c.sha,force:false})});return {commitSha:c.sha,commitUrl:c.html_url,branch:b,repositoryUrl:`https://github.com/${owner}/${repo}`};}
+function validate(files){const p=files.find(f=>f.path==='package.json'),w=[];if(!p){w.push('No package.json found.');return w;}try{const j=JSON.parse(p.content.toString());if(!j.scripts?.build)w.push('package.json has no build script.');}catch{throw new Error('package.json is not valid JSON.');}return w;}
+app.get('/api/health',async(_q,s)=>{try{requireToken();const u=await user();s.json({ok:true,version:'0.3.0',githubAccount:u.login,requiredEnvironmentVariables:['GITHUB_TOKEN']});}catch(e){s.status(e.status||500).json({ok:false,error:e.message,requiredEnvironmentVariables:['GITHUB_TOKEN']});}});
+app.post('/api/ship',upload.single('project'),async(req,res)=>{try{requireToken();if(!req.file)throw new Error('Project ZIP is required.');const repo=String(req.body.repositoryName||'').trim(),b=String(req.body.branch||'main').trim(),project=String(req.body.projectName||'').trim(),message=String(req.body.message||`Deploy ${project||repo} with ShipIt`).trim();name(repo,'repository name');name(project,'project name');branch(b);const u=await user();const files=extract(req.file.buffer),warnings=validate(files);let created;try{created=await createRepo(repo,project);}catch(e){if(e.status===422)throw new Error(`GitHub repository "${repo}" could not be created. It may already exist or the token lacks repository-creation permission.`);throw e;}const result=await ship({files,owner:u.login,repo,b,message});res.json({ok:true,requestId:crypto.randomUUID(),projectName:project,githubAccount:u.login,project:{fileCount:files.length,totalBytes:files.reduce((a,f)=>a+f.size,0),warnings},github:{...result,created:true,repositoryId:created.id},deployment:{provider:'Vercel',projectName:project,status:'GITHUB_PUSHED',message:'GitHub is ready. If your Vercel Git integration is authorized for this account, Vercel can deploy this repository using the requested project name.'}});}catch(e){console.error(e);res.status(e.code==='LIMIT_FILE_SIZE'?413:e.status||500).json({ok:false,error:e.code==='LIMIT_FILE_SIZE'?`Upload exceeds ${MAX_UPLOAD_MB} MB.`:e.message||'Ship failed.'});}});
+app.listen(PORT,()=>console.log(`ShipIt v0.3 running at http://localhost:${PORT}`));
