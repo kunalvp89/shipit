@@ -1,183 +1,121 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#0b0d12" />
-  <title>ShipIt v0.2</title>
-  <style>
-    :root { color-scheme:dark; font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#0b0d12;color:#f5f7fb }
-    *{box-sizing:border-box} body{margin:0;min-height:100vh;background:radial-gradient(circle at 20% 0%,rgba(74,108,255,.16),transparent 35%),radial-gradient(circle at 90% 20%,rgba(0,224,150,.10),transparent 30%),#0b0d12}
-    .shell{width:min(720px,100%);margin:auto;padding:18px 16px 48px}.brand{display:flex;align-items:center;gap:10px;font-size:24px;font-weight:800}.rocket{width:40px;height:40px;display:grid;place-items:center;border-radius:13px;background:#171b27}.tagline{margin:8px 0 20px;color:#9ca5b7;font-size:14px}
-    .card{background:rgba(19,22,31,.94);border:1px solid #292f3d;border-radius:20px;padding:18px;margin-bottom:14px;box-shadow:0 18px 60px rgba(0,0,0,.28)}
-    label{display:block;font-size:13px;color:#aeb6c6;margin-bottom:7px}.field{margin-bottom:14px}
-    input[type=text]{width:100%;padding:13px 12px;border-radius:12px;border:1px solid #343b4b;background:#0f1219;color:#f5f7fb;outline:none}
-    input:focus{border-color:#6d82ff}.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-    .drop{border:1.5px dashed #3c4659;border-radius:16px;padding:24px 14px;text-align:center;background:#0f1219;cursor:pointer}.drop:hover{border-color:#7486ff}.drop strong{display:block;margin-top:8px}.drop span{display:block;color:#8993a7;font-size:12px;margin-top:5px}.hidden{display:none}
-    button{width:100%;border:0;border-radius:14px;padding:14px 16px;font-size:15px;font-weight:800;color:white;background:linear-gradient(135deg,#6577ff,#4b5fe7);cursor:pointer}button:disabled{opacity:.55;cursor:not-allowed}
-    .status{display:none}.status.show{display:block}.status-title{font-weight:800;margin-bottom:7px}.status-body{color:#aab2c1;font-size:13px;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere}.success{border-color:#235d4b;background:#0e1d19}.error{border-color:#6a3030;background:#211214}.warn{border-color:#63531d;background:#1c190d}
-    a{color:#8fa0ff}.hint{color:#7f899c;font-size:12px;line-height:1.5;margin-top:10px}.pill{display:inline-block;padding:5px 8px;border-radius:999px;background:#202637;color:#bfc8dc;font-size:11px;margin-top:8px}
-    .steps{display:grid;gap:8px;margin-top:12px}.step{display:flex;align-items:center;gap:9px;color:#aab2c1;font-size:13px}.dot{width:9px;height:9px;border-radius:50%;background:#3a4252}.dot.ok{background:#41d39a}.dot.pending{background:#7486ff}
-    @media(max-width:520px){.row{grid-template-columns:1fr}.shell{padding-top:10px}.card{border-radius:17px}}
-  </style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#101114">
+  <meta name="description" content="Private credit card bill reminder">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="stylesheet" href="/css/app.css">
+  <title>CardDue</title>
 </head>
 <body>
-<main class="shell">
-  <div class="brand"><div class="rocket">🚀</div> ShipIt</div>
-  <div class="tagline">ZIP → validate → GitHub → Vercel, without a terminal.</div>
+  <div class="app-shell">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">PRIVATE WALLET</div>
+        <h1>CardDue</h1>
+      </div>
+      <button id="notifyBtn" class="icon-btn" title="Notifications" aria-label="Notifications">🔔</button>
+    </header>
 
-  <section class="card">
-    <form id="shipForm">
-      <div class="field">
-        <label>Project ZIP</label>
-        <label class="drop" for="project">
-          <div style="font-size:30px">📦</div>
-          <strong id="fileLabel">Select project ZIP</strong>
-          <span id="uploadHint">ZIP only</span>
-          <input class="hidden" id="project" name="project" type="file" accept=".zip,application/zip" required />
+    <main>
+      <section class="hero">
+        <div>
+          <p class="muted">Upcoming payments</p>
+          <div id="totalUpcoming" class="hero-amount">₹0</div>
+        </div>
+        <button id="addCardBtn" class="primary-btn">+ Add card</button>
+      </section>
+
+      <section>
+        <div class="section-head">
+          <h2>Your cards</h2>
+          <span id="cardCount" class="pill">0</span>
+        </div>
+        <div id="cardCarousel" class="card-carousel"></div>
+        <div id="carouselDots" class="dots"></div>
+      </section>
+
+      <section>
+        <div class="section-head">
+          <h2>Upcoming</h2>
+          <button id="refreshBtn" class="text-btn">Refresh</button>
+        </div>
+        <div id="upcomingList" class="upcoming-list"></div>
+      </section>
+
+      <section>
+        <div class="section-head">
+          <h2>Recent payments</h2>
+        </div>
+        <div id="historyList" class="history-list"></div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <span>Data stays in this browser</span>
+      <button id="exportBtn" class="text-btn">Export backup</button>
+    </footer>
+  </div>
+
+  <div id="modalBackdrop" class="modal-backdrop hidden">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modal-head">
+        <h2 id="modalTitle">Add credit card</h2>
+        <button id="closeModal" class="icon-btn">✕</button>
+      </div>
+      <form id="cardForm">
+        <input type="hidden" id="cardId">
+        <label>Card name<input id="cardName" required maxlength="40" placeholder="HDFC Regalia"></label>
+        <label>Bank / issuer<input id="issuer" required maxlength="40" placeholder="HDFC Bank"></label>
+        <label>Last 4 digits<input id="last4" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" placeholder="1234"></label>
+
+        <div class="form-grid">
+          <label>Statement day
+            <input id="statementDay" type="number" min="1" max="31" required value="15">
+          </label>
+          <label>Due days after statement
+            <input id="dueDays" type="number" min="0" max="60" required value="20">
+          </label>
+        </div>
+
+        <label>Reminder days before due
+          <input id="reminderDays" value="7,3,1,0" placeholder="7,3,1,0">
+          <small>Example: 7,3,1,0 means 7 days, 3 days, 1 day and due day.</small>
         </label>
-      </div>
 
-      <div class="row">
-        <div class="field"><label for="owner">GitHub owner</label><input id="owner" name="owner" type="text" autocomplete="off" /></div>
-        <div class="field"><label for="repo">Repository</label><input id="repo" name="repo" type="text" autocomplete="off" /></div>
-      </div>
+        <label class="switch-row">
+          <span>Active reminders</span>
+          <input id="active" type="checkbox" checked>
+        </label>
 
-      <div class="row">
-        <div class="field"><label for="branch">Branch</label><input id="branch" name="branch" type="text" value="main" /></div>
-        <div class="field"><label for="message">Commit message</label><input id="message" name="message" type="text" value="Ship project with ShipIt" /></div>
-      </div>
-
-      <button id="shipButton" type="submit">🚀 Ship</button>
-    </form>
-
-    <div id="steps" class="steps" style="display:none">
-      <div class="step"><span id="s1" class="dot pending"></span> Upload and inspect</div>
-      <div class="step"><span id="s2" class="dot"></span> Validate project</div>
-      <div class="step"><span id="s3" class="dot"></span> Build check</div>
-      <div class="step"><span id="s4" class="dot"></span> GitHub commit</div>
-      <div class="step"><span id="s5" class="dot"></span> Vercel deployment</div>
+        <button class="primary-btn full" type="submit">Save card</button>
+      </form>
     </div>
+  </div>
 
-    <div id="status" class="status card" style="margin:14px 0 0">
-      <div id="statusTitle" class="status-title"></div>
-      <div id="statusBody" class="status-body"></div>
+  <div id="billModalBackdrop" class="modal-backdrop hidden">
+    <div class="modal" role="dialog" aria-modal="true">
+      <div class="modal-head">
+        <h2>Statement</h2>
+        <button id="closeBillModal" class="icon-btn">✕</button>
+      </div>
+      <form id="billForm">
+        <input type="hidden" id="billCardId">
+        <label>Statement date<input id="billStatementDate" type="date" required></label>
+        <label>Total amount<input id="billAmount" type="number" min="0" step="0.01" required placeholder="18450"></label>
+        <label>Minimum due<input id="billMinimum" type="number" min="0" step="0.01" placeholder="1845"></label>
+        <div class="calculated">
+          <span>Calculated due date</span>
+          <strong id="calculatedDueDate">—</strong>
+        </div>
+        <button class="primary-btn full" type="submit">Save statement</button>
+      </form>
     </div>
-  </section>
+  </div>
 
-  <section class="card">
-    <div style="font-weight:800">Credential model</div>
-    <div class="hint">
-      GitHub token is server-side only and is read from the ShipIt's pipeline environment.
-      It is never sent by the phone/browser. Vercel credentials, when enabled, are also server-side environment variables.
-    </div>
-    <span class="pill">v0.2</span>
-  </section>
-</main>
-
-<script>
-const $ = id => document.getElementById(id);
-const form = $("shipForm"), project = $("project"), button = $("shipButton");
-const status = $("status"), statusTitle = $("statusTitle"), statusBody = $("statusBody");
-
-project.addEventListener("change", () => $("fileLabel").textContent = project.files[0]?.name || "Select project ZIP");
-
-function show(title, body, type="") {
-  status.className = `status card show ${type}`;
-  statusTitle.textContent = title;
-  statusBody.innerHTML = body;
-}
-function step(n, state="ok") { $("s"+n).className = `dot ${state}`; }
-
-async function loadConfig() {
-  try {
-    const r = await fetch("/api/config"), c = await r.json();
-    $("owner").value = c.owner || "";
-    $("repo").value = c.repo || "";
-    $("branch").value = c.branch || "main";
-    $("uploadHint").textContent = `ZIP only · max ${c.maxUploadMb} MB · build check ${c.buildCheckEnabled ? "ON" : "OFF"}`;
-  } catch {}
-}
-
-form.addEventListener("submit", async e => {
-  e.preventDefault();
-  if (!project.files.length) return;
-
-  button.disabled = true;
-  button.textContent = "⏳ Shipping...";
-  $("steps").style.display = "grid";
-  [1,2,3,4,5].forEach(n => { $("s"+n).className = "dot"; });
-  step(1, "pending");
-  show("Shipping project", "Uploading and inspecting the ZIP...", "");
-
-  const data = new FormData(form);
-
-  try {
-    const response = await fetch("/api/ship", { method:"POST", body:data });
-    const result = await response.json();
-
-    step(1, "ok"); step(2, "ok");
-    if (result.build?.enabled) step(3, result.build.passed ? "ok" : "pending");
-    else step(3, "ok");
-
-    if (!response.ok || !result.ok) {
-      throw new Error(result.error || "Ship failed.");
-    }
-
-    step(4, "ok"); step(5, "pending");
-
-    let warnings = result.project.warnings?.length
-      ? `\n\nWarnings:\n• ${result.project.warnings.join("\n• ")}`
-      : "";
-
-    show(
-      "🚀 GitHub commit created",
-      `Files: ${result.project.fileCount}\nCommit: ${result.github.commitSha.slice(0,12)}\n\n` +
-      `<a href="${result.github.commitUrl}" target="_blank" rel="noreferrer">Open GitHub commit →</a>\n` +
-      `<a href="${result.github.repositoryUrl}" target="_blank" rel="noreferrer">Open repository →</a>\n\n` +
-      `Vercel should now start its Git deployment pipeline.` + warnings,
-      "success"
-    );
-
-    // Poll the optional Vercel status endpoint a few times.
-    if (result.vercel?.statusConfigured) {
-      for (let i=0; i<8; i++) {
-        await new Promise(r => setTimeout(r, 3000));
-        const vr = await fetch("/api/deployment");
-        const vd = await vr.json();
-        const d = vd.deployment;
-        if (d) {
-          if (d.state === "READY") {
-            step(5, "ok");
-            show(
-              "🚀 Deployment ready",
-              `GitHub commit: ${result.github.commitSha.slice(0,12)}\n\n` +
-              `<a href="${result.github.commitUrl}" target="_blank" rel="noreferrer">GitHub commit →</a>\n` +
-              (d.url ? `<a href="${d.url}" target="_blank" rel="noreferrer">Open Vercel deployment →</a>` : ""),
-              "success"
-            );
-            break;
-          }
-          if (["ERROR","CANCELED"].includes(d.state)) {
-            step(5, "pending");
-            show("⚠️ Vercel deployment did not complete", `Deployment state: ${d.state}\n\n` +
-              (d.url ? `<a href="${d.url}" target="_blank" rel="noreferrer">Open deployment →</a>` : ""), "warn");
-            break;
-          }
-        }
-      }
-    } else {
-      step(5, "pending");
-    }
-  } catch (error) {
-    show("❌ Ship failed", error.message, "error");
-  } finally {
-    button.disabled = false;
-    button.textContent = "🚀 Ship";
-  }
-});
-
-loadConfig();
-</script>
+  <div id="toast" class="toast hidden"></div>
+  <script src="/js/app.js"></script>
 </body>
 </html>
