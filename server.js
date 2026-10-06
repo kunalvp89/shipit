@@ -13,7 +13,7 @@ const MAX_FILE_SIZE_MB = 5;
 const GITHUB_API = 'https://api.github.com';
 const GITHUB_API_VERSION = '2022-11-28';
 const VERCEL_API = 'https://api.vercel.com';
-const SHIPIT_VERSION = '4.1.0';
+const SHIPIT_VERSION = '5.0.0';
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -279,7 +279,6 @@ function vercelHeaders(extra = {}) {
   return {
     Accept: 'application/json',
     Authorization: `Bearer ${process.env.SHIPIT_VERCEL_TOKEN}`,
-    'Content-Type': 'application/json',
     ...extra
   };
 }
@@ -308,59 +307,67 @@ async function getVercelProject(name) {
   return vercelApi(`/v9/projects/${encodeURIComponent(name)}`);
 }
 
-function projectLinkedToRepo(project, owner, repo) {
-  const link = project?.link;
-  if (!link) return false;
-  const expected = `${owner}/${repo}`.toLowerCase();
-  const candidates = [link.repo, link.repository, link.url].filter(Boolean).map(String).map(v => v.toLowerCase());
-  return candidates.some(v => v === expected || v.endsWith(`/${expected}`) || v.includes(`github.com/${expected}`));
-}
-
-async function ensureVercelProject({ name, owner, repo }) {
+async function ensureVercelProject(name) {
   try {
     const existing = await getVercelProject(name);
-    if (!projectLinkedToRepo(existing, owner, repo)) {
-      const e = new Error(`A Vercel project named "${name}" already exists and is not linked to ${owner}/${repo}. Choose another project name.`);
-      e.code = 'VERCEL_PROJECT_EXISTS_DIFFERENT_REPO';
-      e.status = 409;
-      throw e;
-    }
     return { project: existing, created: false };
   } catch (error) {
-    if (error.code === 'VERCEL_PROJECT_EXISTS_DIFFERENT_REPO') throw error;
     if (!(error instanceof ApiError) || error.status !== 404) throw error;
   }
 
   const project = await vercelApi('/v11/projects', {
     method: 'POST',
-    body: JSON.stringify({
-      name,
-      gitRepository: {
-        type: 'github',
-        repo: `https://github.com/${owner}/${repo}`
-      }
-    })
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name })
   });
   return { project, created: true };
 }
 
-async function listRecentDeployments(projectId, since) {
-  const params = new URLSearchParams({ projectId, limit: '10' });
-  if (since) params.set('since', String(since));
-  return vercelApi(`/v6/deployments?${params.toString()}`);
+async function uploadVercelFile(file) {
+  const digest = crypto.createHash('sha1').update(file.content).digest('hex');
+  const endpoint = '/v2/files';
+  const response = await fetch(`${VERCEL_API}${endpoint}`, {
+    method: 'POST',
+    headers: vercelHeaders({
+      'Content-Type': 'application/octet-stream',
+      'Content-Length': String(file.content.length),
+      'x-vercel-digest': digest
+    }),
+    body: file.content
+  });
+  const text = await response.text();
+  if (!response.ok) {
+    let data = {};
+    try { data = text ? JSON.parse(text) : {}; } catch { data = { message: text }; }
+    throw new ApiError(
+      data?.error?.message || data?.message || `Vercel file upload returned HTTP ${response.status}.`,
+      response.status,
+      'Vercel',
+      endpoint,
+      data?.error?.code || ''
+    );
+  }
+  return { file: file.path, sha: digest, size: file.content.length };
 }
 
-async function createGitDeployment({ projectId, name, owner, repo, branch }) {
+async function uploadAllVercelFiles(files) {
+  const refs = [];
+  for (const file of files) refs.push(await uploadVercelFile(file));
+  return refs;
+}
+
+async function createDirectVercelDeployment({ projectId, projectName, files }) {
+  const refs = await uploadAllVercelFiles(files);
   return vercelApi('/v13/deployments', {
     method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      name,
+      name: projectName,
       project: projectId,
       target: 'production',
-      gitSource: {
-        type: 'github',
-        repo: `${owner}/${repo}`,
-        ref: branch
+      files: refs,
+      projectSettings: {
+        framework: null
       }
     })
   });
@@ -375,7 +382,7 @@ function deploymentUrl(deployment) {
     const production = deployment.alias.find(a => !String(a).includes('-git-')) || deployment.alias[0];
     return `https://${production}`;
   }
-  if (deployment?.url) return `https://${deployment.url}`;
+  if (deployment?.url) return String(deployment.url).startsWith('http') ? deployment.url : `https://${deployment.url}`;
   return null;
 }
 
@@ -397,25 +404,6 @@ async function waitForDeployment(deploymentId, maxMs = 180000) {
   return last || {};
 }
 
-async function findOrCreateDeployment({ projectId, projectName, owner, repo, branch, startedAt }) {
-  // Creating a project from a GitHub repository normally starts its first deployment.
-  // Reuse that deployment when it was created by this ShipIt operation.
-  const recent = await listRecentDeployments(projectId, startedAt);
-  let deployment = (recent.deployments || []).find(d => {
-    const ref = d?.meta?.githubCommitRef || d?.meta?.githubCommitMessage;
-    return !ref || String(ref).toLowerCase() === branch.toLowerCase();
-  });
-
-  if (!deployment && Array.isArray(recent.deployments) && recent.deployments.length) {
-    deployment = recent.deployments[0];
-  }
-
-  if (!deployment) {
-    deployment = await createGitDeployment({ projectId, name: projectName, owner, repo, branch });
-  }
-  return deployment;
-}
-
 function publicApiError(error) {
   const out = { error: error.message || 'Request failed.' };
   if (error.code) out.code = error.code;
@@ -435,38 +423,25 @@ function publicApiError(error) {
 }
 
 app.get('/api/health', async (req, res) => {
+  const result = { ok: false, version: SHIPIT_VERSION, github: { connected: false }, vercel: { connected: false }, requiredEnvironmentVariables: ['GITHUB_TOKEN', 'SHIPIT_VERCEL_TOKEN'] };
   try {
     const gh = await githubUser();
-    const vc = await vercelUser();
-    res.json({
-      ok: true,
-      version: SHIPIT_VERSION,
-      github: { connected: true, account: gh.login },
-      vercel: { connected: true, username: vc.username, name: vc.name },
-      requiredEnvironmentVariables: ['GITHUB_TOKEN', 'SHIPIT_VERCEL_TOKEN']
-    });
+    result.github = { connected: true, account: gh.login };
   } catch (error) {
-    res.status(error.status || 500).json({
-      ok: false,
-      version: SHIPIT_VERSION,
-      ...publicApiError(error),
-      requiredEnvironmentVariables: ['GITHUB_TOKEN', 'SHIPIT_VERCEL_TOKEN']
-    });
+    result.github = { connected: false, error: error.message };
   }
-});
-
-app.get('/api/vercel/status', async (req, res) => {
   try {
-    const user = await vercelUser();
-    res.json({ ok: true, connected: true, user: { username: user.username, name: user.name } });
+    const vc = await vercelUser();
+    result.vercel = { connected: true, username: vc.username, name: vc.name };
   } catch (error) {
-    res.status(error.status || 500).json({ ok: false, connected: false, ...publicApiError(error) });
+    result.vercel = { connected: false, error: error.message };
   }
+  result.ok = result.github.connected && result.vercel.connected;
+  res.status(result.ok ? 200 : 503).json(result);
 });
 
 app.post('/api/ship', upload.single('project'), async (req, res) => {
   const requestId = crypto.randomUUID();
-  const startedAt = Date.now();
   try {
     requireEnv('GITHUB_TOKEN');
     requireEnv('SHIPIT_VERCEL_TOKEN');
@@ -486,36 +461,23 @@ app.post('/api/ship', upload.single('project'), async (req, res) => {
     const warnings = validateProject(files);
     const totalBytes = files.reduce((sum, f) => sum + f.size, 0);
 
+    // GitHub is the source-of-record copy.
     const repository = await createOrFailRepository(githubAccount.login, repo, projectName);
-    const ghResult = await shipGithubFiles({
-      files,
-      owner: githubAccount.login,
-      repo,
-      branch,
-      message
-    });
+    const ghResult = await shipGithubFiles({ files, owner: githubAccount.login, repo, branch, message });
 
+    // Vercel receives the same files directly. It does NOT need GitHub access.
     const vercelUserData = await vercelUser();
-    const { project, created: vercelProjectCreated } = await ensureVercelProject({
-      name: projectName,
-      owner: githubAccount.login,
-      repo
-    });
-
-    const deployment = await findOrCreateDeployment({
+    const { project, created: vercelProjectCreated } = await ensureVercelProject(projectName);
+    const deployment = await createDirectVercelDeployment({
       projectId: project.id,
       projectName,
-      owner: githubAccount.login,
-      repo,
-      branch,
-      startedAt
+      files
     });
 
     const final = await waitForDeployment(deployment.id);
     const state = deploymentState(final);
     const liveUrl = deploymentUrl(final) || deploymentUrl(deployment);
     const inspectorUrl = deploymentInspectorUrl(final) || deploymentInspectorUrl(deployment);
-
     const projectUrl = vercelUserData.username
       ? `https://vercel.com/${vercelUserData.username}/${projectName}`
       : `https://vercel.com/${projectName}`;
@@ -538,6 +500,7 @@ app.post('/api/ship', upload.single('project'), async (req, res) => {
         url: liveUrl,
         deploymentUrl: deployment.url ? `https://${deployment.url}` : null,
         inspectorUrl,
+        source: 'direct-files',
         message: state === 'READY'
           ? 'Production deployment is live.'
           : `Vercel deployment finished with state ${state}.`

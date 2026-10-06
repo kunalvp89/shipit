@@ -54,8 +54,8 @@
       <div id="steps" style="margin-top:7px">
         <div class="step" data-step="zip"><span class="dot"></span>Read and validate ZIP</div>
         <div class="step" data-step="github"><span class="dot"></span>Create GitHub repository and commit</div>
-        <div class="step" data-step="vercel-project"><span class="dot"></span>Create/link Vercel project</div>
-        <div class="step" data-step="deploy"><span class="dot"></span>Deploy production from GitHub</div>
+        <div class="step" data-step="vercel-project"><span class="dot"></span>Create Vercel project</div>
+        <div class="step" data-step="deploy"><span class="dot"></span>Deploy production directly</div>
         <div class="step" data-step="ready"><span class="dot"></span>Wait for live URL</div>
       </div>
     </div>
@@ -66,9 +66,9 @@
   <section class="card">
     <b>Environment</b>
     <div class="hint">Only these two server environment variables are required:</div>
-    <div class="detail"><b>GITHUB_TOKEN</b><br>GitHub credential allowed to create private repositories.</div>
+    <div class="detail"><b>GITHUB_TOKEN</b><br>GitHub credential allowed to create private repositories and push commits.</div>
     <div class="detail"><b>SHIPIT_VERCEL_TOKEN</b><br>Vercel access token allowed to create projects and production deployments.</div>
-    <div class="note">Your tokens never reach the browser and are never included in GitHub commits or project files.</div>
+    <div class="note">Your tokens never reach the browser and are never included in GitHub commits or project files. ShipIt deploys the uploaded files directly to Vercel, so Vercel does not need GitHub repository access for the initial deployment.</div>
   </section>
 </main>
 
@@ -110,7 +110,7 @@ f.onsubmit=async e=>{
       let html=esc(d.error||'Ship failed.');
       if(d.service)html+=`<div class="detail"><b>${esc(d.service)} API</b><br>HTTP: ${esc(d.status||'')}<br>Endpoint: ${esc(d.endpoint||'')}${d.details?`<br>Details: ${esc(d.details)}`:''}</div>`;
       if(d.code==='GITHUB_REPO_CREATE_PERMISSION')html+=`<div class="detail"><span class="warn">GitHub fix:</span> use a token that can create repositories for the account.</div>`;
-      if(d.service==='Vercel')html+=`<div class="detail"><span class="warn">Vercel fix:</span> verify the Vercel token has permission to create projects/deploy and that the Vercel account can access the GitHub repository.</div>`;
+      if(d.service==='Vercel')html+=`<div class="detail"><span class="warn">Vercel fix:</span> verify SHIPIT_VERCEL_TOKEN can create projects and production deployments. GitHub access is not required for the Vercel deployment because ShipIt uploads the project files directly.</div>`;
       throw Error(html);
     }
     ['zip','github','vercel-project','deploy','ready'].forEach(x=>setStep(x,'done'));

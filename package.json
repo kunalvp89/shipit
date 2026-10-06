@@ -1,8 +1,8 @@
 {
   "name": "shipit",
-  "version": "4.1.0",
+  "version": "5.0.0",
   "private": true,
-  "description": "Mobile-first GitHub and Vercel deployment gateway",
+  "description": "Mobile-first GitHub and direct Vercel deployment gateway",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
