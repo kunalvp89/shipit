@@ -278,14 +278,14 @@ function validateProject(files) {
 function vercelHeaders(extra = {}) {
   return {
     Accept: 'application/json',
-    Authorization: `Bearer ${process.env.VERCEL_TOKEN}`,
+    Authorization: `Bearer ${process.env.SHIPIT_VERCEL_TOKEN}`,
     'Content-Type': 'application/json',
     ...extra
   };
 }
 
 async function vercelApi(endpoint, options = {}) {
-  requireEnv('VERCEL_TOKEN');
+  requireEnv('SHIPIT_VERCEL_TOKEN');
   const response = await fetch(`${VERCEL_API}${endpoint}`, {
     ...options,
     headers: vercelHeaders(options.headers || {})
@@ -443,14 +443,14 @@ app.get('/api/health', async (req, res) => {
       version: SHIPIT_VERSION,
       github: { connected: true, account: gh.login },
       vercel: { connected: true, username: vc.username, name: vc.name },
-      requiredEnvironmentVariables: ['GITHUB_TOKEN', 'VERCEL_TOKEN']
+      requiredEnvironmentVariables: ['GITHUB_TOKEN', 'SHIPIT_VERCEL_TOKEN']
     });
   } catch (error) {
     res.status(error.status || 500).json({
       ok: false,
       version: SHIPIT_VERSION,
       ...publicApiError(error),
-      requiredEnvironmentVariables: ['GITHUB_TOKEN', 'VERCEL_TOKEN']
+      requiredEnvironmentVariables: ['GITHUB_TOKEN', 'SHIPIT_VERCEL_TOKEN']
     });
   }
 });
@@ -469,7 +469,7 @@ app.post('/api/ship', upload.single('project'), async (req, res) => {
   const startedAt = Date.now();
   try {
     requireEnv('GITHUB_TOKEN');
-    requireEnv('VERCEL_TOKEN');
+    requireEnv('SHIPIT_VERCEL_TOKEN');
     if (!req.file) throw new Error('Project ZIP is required.');
 
     const repo = String(req.body.repositoryName || '').trim();
