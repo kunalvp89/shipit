@@ -1,18 +1,125 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0b0d12"><title>ShipIt v4.0</title><style>
-:root{color-scheme:dark;font-family:system-ui,sans-serif}*{box-sizing:border-box}body{margin:0;background:#0b0d12;color:#f5f7fb;min-height:100vh}.shell{max-width:720px;margin:auto;padding:20px 16px}.brand{font-size:25px;font-weight:800}.tag{color:#9ca5b7;font-size:14px;margin:7px 0 20px}.card{background:#13161f;border:1px solid #292f3d;border-radius:18px;padding:18px;margin-bottom:14px}label{display:block;font-size:13px;color:#aeb6c6;margin-bottom:7px}.field{margin-bottom:14px}.input, input{width:100%;padding:13px;border-radius:12px;border:1px solid #343b4b;background:#0f1219;color:#fff}.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}.drop{border:1px dashed #465066;border-radius:15px;padding:25px;text-align:center;cursor:pointer}.hidden{display:none}button{width:100%;padding:14px;border:0;border-radius:13px;background:#596cf3;color:#fff;font-weight:800;font-size:15px;cursor:pointer}.secondary{background:#252b3a}.status{display:none;margin-top:14px}.show{display:block}.success{border-color:#235d4b;background:#0e1d19}.error{border-color:#6a3030;background:#211214}.body{white-space:pre-wrap;color:#aeb6c6;font-size:13px;line-height:1.55}.detail{margin-top:12px;padding:12px;border-radius:12px;background:#0d1016;border:1px solid #303747;font-size:12px;line-height:1.55}.detail b{color:#fff}.ok{color:#8ee1c2}.warn{color:#f2c879}.hint{font-size:12px;color:#7f899c;line-height:1.5}a{color:#91a0ff;display:block;margin-top:6px}.pill{display:inline-block;padding:5px 9px;border-radius:999px;font-size:12px;margin-top:6px;background:#202637}.connected{color:#8ee1c2}.disconnected{color:#f2c879}@media(max-width:520px){.row{grid-template-columns:1fr}}
-</style></head><body><main class="shell"><div class="brand">🚀 ShipIt</div><div class="tag">ZIP → GitHub → Vercel → live URL, directly from your phone.</div>
-<section class="card"><b>Vercel connection</b><div id="vs" class="pill disconnected">⚪ Not connected</div><div class="hint" style="margin-top:10px">One-time setup: create a Vercel App with client authentication method <b>none</b>, configure this callback URL, then enter its Client ID below. The Client ID is not a secret.</div><div class="field" style="margin-top:12px"><label>Vercel App Client ID</label><input id="clientId" placeholder="cl_..." autocomplete="off"></div><div class="row"><button type="button" id="connect">🔐 Connect Vercel</button><button type="button" id="disconnect" class="secondary">Disconnect</button></div><div id="callback" class="detail" style="display:none"></div></section>
-<section class="card"><form id="f"><div class="field"><label>Project ZIP</label><label class="drop" for="zip"><div style="font-size:30px">📦</div><b id="fn">Select project ZIP</b><div class="hint">Single wrapper folders are automatically unwrapped when package.json is inside.</div><input class="hidden" id="zip" name="project" type="file" accept=".zip" required></label></div><div class="field"><label>Vercel project / deployment name</label><input name="projectName" placeholder="credit-bill-reminder" required></div><div class="row"><div class="field"><label>GitHub repository</label><input name="repositoryName" placeholder="credit-card-bill-reminder" required></div><div class="field"><label>Branch</label><input name="branch" value="main" required></div></div><div class="field"><label>Commit message</label><input name="message" value="Ship project with ShipIt"></div><button id="b">🚀 Create & Deploy</button></form><div id="s" class="card status"><b id="st"></b><div id="sb" class="body"></div></div></section>
-<section class="card"><b>Environment</b><div class="hint">Only <b>GITHUB_TOKEN</b> is required as a server environment variable. Vercel OAuth tokens are stored server-side in HttpOnly cookies after you authorize ShipIt.</div></section></main>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0b0d12">
+<title>ShipIt v4.1</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}*{box-sizing:border-box}body{margin:0;background:#0b0d12;color:#f5f7fb;min-height:100vh}.shell{max-width:720px;margin:auto;padding:20px 16px 36px}.brand{font-size:27px;font-weight:850}.tag{color:#9ca5b7;font-size:14px;margin:7px 0 20px}.card{background:#13161f;border:1px solid #292f3d;border-radius:18px;padding:18px;margin-bottom:14px}label{display:block;font-size:13px;color:#aeb6c6;margin-bottom:7px}.field{margin-bottom:14px}.input,input{width:100%;padding:13px;border-radius:12px;border:1px solid #343b4b;background:#0f1219;color:#fff;font-size:15px}.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}.drop{border:1px dashed #465066;border-radius:15px;padding:25px;text-align:center;cursor:pointer}.hidden{display:none}button{width:100%;padding:14px;border:0;border-radius:13px;background:#596cf3;color:#fff;font-weight:800;font-size:15px;cursor:pointer}button:disabled{opacity:.6;cursor:wait}.secondary{background:#252b3a}.status{display:none;margin-top:14px}.show{display:block}.success{border-color:#235d4b;background:#0e1d19}.error{border-color:#6a3030;background:#211214}.body{white-space:pre-wrap;color:#aeb6c6;font-size:13px;line-height:1.55}.detail{margin-top:12px;padding:12px;border-radius:12px;background:#0d1016;border:1px solid #303747;font-size:12px;line-height:1.6}.detail b{color:#fff}.ok{color:#8ee1c2}.warn{color:#f2c879}.hint{font-size:12px;color:#7f899c;line-height:1.5}.step{display:flex;gap:10px;align-items:center;padding:9px 0;color:#aeb6c6;font-size:13px}.step .dot{width:9px;height:9px;border-radius:50%;background:#4b5364;flex:0 0 auto}.step.done .dot{background:#65d5ae}.step.active .dot{background:#7889ff;box-shadow:0 0 0 5px #7889ff22}.step.done{color:#e4f8f1}.step.active{color:#fff}.pill{display:inline-block;padding:5px 9px;border-radius:999px;font-size:12px;margin-top:6px;background:#202637}.connected{color:#8ee1c2}.disconnected{color:#f2c879}a{color:#91a0ff;display:block;margin-top:6px;word-break:break-word}.hero-url{font-size:18px;font-weight:800;margin-top:10px}.note{padding:10px 12px;background:#0d1016;border:1px solid #303747;border-radius:12px;margin-top:12px;font-size:12px;color:#aeb6c6;line-height:1.55}@media(max-width:520px){.row{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main class="shell">
+  <div class="brand">🚀 ShipIt</div>
+  <div class="tag">ZIP → GitHub → Vercel → production → live URL.</div>
+
+  <section class="card">
+    <b>Connections</b>
+    <div id="githubStatus" class="pill disconnected">⚪ GitHub checking…</div>
+    <div id="vercelStatus" class="pill disconnected">⚪ Vercel checking…</div>
+    <div class="hint" style="margin-top:12px">No OAuth or Vercel App setup is required. ShipIt uses server-side API tokens.</div>
+    <button type="button" id="check" class="secondary" style="margin-top:12px">🔄 Check connections</button>
+  </section>
+
+  <section class="card">
+    <form id="f">
+      <div class="field">
+        <label>Project ZIP</label>
+        <label class="drop" for="zip">
+          <div style="font-size:30px">📦</div>
+          <b id="fn">Select project ZIP</b>
+          <div class="hint">Wrapper folders are automatically unwrapped when package.json is inside.</div>
+          <input class="hidden" id="zip" name="project" type="file" accept=".zip" required>
+        </label>
+      </div>
+
+      <div class="field">
+        <label>Vercel project / deployment name</label>
+        <input name="projectName" placeholder="CreditBillReminder" required>
+        <div class="hint">ShipIt normalizes this to a valid Vercel project slug automatically.</div>
+      </div>
+
+      <div class="row">
+        <div class="field"><label>GitHub repository</label><input name="repositoryName" placeholder="credit-card-bill-reminder" required></div>
+        <div class="field"><label>Branch</label><input name="branch" value="main" required></div>
+      </div>
+
+      <div class="field"><label>Commit message</label><input name="message" value="Ship project with ShipIt"></div>
+      <button id="b">🚀 Create & Deploy</button>
+    </form>
+
+    <div id="progress" class="card status">
+      <b>Deployment progress</b>
+      <div id="steps" style="margin-top:7px">
+        <div class="step" data-step="zip"><span class="dot"></span>Read and validate ZIP</div>
+        <div class="step" data-step="github"><span class="dot"></span>Create GitHub repository and commit</div>
+        <div class="step" data-step="vercel-project"><span class="dot"></span>Create/link Vercel project</div>
+        <div class="step" data-step="deploy"><span class="dot"></span>Deploy production from GitHub</div>
+        <div class="step" data-step="ready"><span class="dot"></span>Wait for live URL</div>
+      </div>
+    </div>
+
+    <div id="s" class="card status"><b id="st"></b><div id="sb" class="body"></div></div>
+  </section>
+
+  <section class="card">
+    <b>Environment</b>
+    <div class="hint">Only these two server environment variables are required:</div>
+    <div class="detail"><b>GITHUB_TOKEN</b><br>GitHub credential allowed to create private repositories.</div>
+    <div class="detail"><b>VERCEL_TOKEN</b><br>Vercel access token allowed to create projects and production deployments.</div>
+    <div class="note">Your tokens never reach the browser and are never included in GitHub commits or project files.</div>
+  </section>
+</main>
+
 <script>
-const f=document.getElementById('f'),z=document.getElementById('zip'),fn=document.getElementById('fn'),s=document.getElementById('s'),st=document.getElementById('st'),sb=document.getElementById('sb'),b=document.getElementById('b'),client=document.getElementById('clientId'),connect=document.getElementById('connect'),disconnect=document.getElementById('disconnect'),vs=document.getElementById('vs'),callback=document.getElementById('callback');
-client.value=localStorage.getItem('shipit_vercel_client_id')||'';z.onchange=()=>fn.textContent=z.files[0]?.name||'Select project ZIP';
+const f=document.getElementById('f'),z=document.getElementById('zip'),fn=document.getElementById('fn'),s=document.getElementById('s'),st=document.getElementById('st'),sb=document.getElementById('sb'),b=document.getElementById('b'),progress=document.getElementById('progress'),githubStatus=document.getElementById('githubStatus'),vercelStatus=document.getElementById('vercelStatus');
+z.onchange=()=>fn.textContent=z.files[0]?.name||'Select project ZIP';
 function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function show(title,body,cls=''){s.className='card status show '+cls;st.textContent=title;sb.innerHTML=body;}
-async function vercelStatus(){try{const r=await fetch('/api/vercel/status');const d=await r.json();if(d.connected){vs.className='pill connected';vs.textContent=`🟢 Connected${d.user?.username?' as '+d.user.username:''}`;}else{vs.className='pill disconnected';vs.textContent='⚪ Not connected';}}catch{}}
-connect.onclick=()=>{const id=client.value.trim();if(!/^cl_[A-Za-z0-9_-]+$/.test(id)){callback.style.display='block';callback.textContent='Enter a valid Vercel App Client ID beginning with cl_. Create the Vercel App with client authentication method "none".';return;}localStorage.setItem('shipit_vercel_client_id',id);window.location.href='/api/vercel/authorize?clientId='+encodeURIComponent(id);};
-disconnect.onclick=async()=>{await fetch('/api/vercel/disconnect',{method:'POST'});vercelStatus();};
-const params=new URLSearchParams(location.search);if(params.get('vercel')==='error'){callback.style.display='block';callback.innerHTML='<span class="warn">Vercel connection failed:</span> '+esc(params.get('message'));history.replaceState({},'',location.pathname);}else if(params.get('vercel')==='connected'){callback.style.display='block';callback.innerHTML='<span class="ok">Vercel connected successfully.</span>';history.replaceState({},'',location.pathname);}vercelStatus();
-function deploymentCard(v){const state=esc(v.state||'UNKNOWN');let html=`<div class="detail"><b>Vercel</b><br>Status: <span class="${v.state==='READY'?'ok':'warn'}">${state}</span>`;if(v.url)html+=`<br><br><a href="${esc(v.url)}" target="_blank" rel="noopener">🌐 Open deployed app →</a>`;if(v.deploymentUrl&&v.deploymentUrl!==v.url)html+=`<a href="${esc(v.deploymentUrl)}" target="_blank" rel="noopener">Open deployment URL →</a>`;if(v.projectUrl)html+=`<a href="${esc(v.projectUrl)}" target="_blank" rel="noopener">Open Vercel project →</a>`;if(v.inspectorUrl)html+=`<a href="${esc(v.inspectorUrl)}" target="_blank" rel="noopener">Open build/deployment details →</a>`;return html+'</div>';}
-f.onsubmit=async e=>{e.preventDefault();if(!z.files.length)return;b.disabled=true;b.textContent='⏳ Creating GitHub + Vercel deployment...';show('🚀 Shipping project','Creating the GitHub repository, pushing your files, creating the Vercel project, uploading the source and waiting for the production deployment...');try{const r=await fetch('/api/ship',{method:'POST',body:new FormData(f)});const d=await r.json();if(!r.ok||!d.ok){let html=esc(d.error||'Ship failed.');if(d.service)html+=`<div class="detail"><b>${esc(d.service)} API</b><br>HTTP: ${esc(d.status||'')}<br>Endpoint: ${esc(d.endpoint||'')}</div>`;if(d.code==='VERCEL_NOT_CONNECTED')html+=`<div class="detail"><span class="warn">Connect Vercel first</span> using the button above, then run Create & Deploy again.</div>`;throw Error(html);}const warnings=d.project.warnings?.length?`<br><br><span class="warn">Warnings:</span><br>• ${d.project.warnings.map(esc).join('<br>• ')}`:'';show('🎉 Project deployed',`GitHub account: ${esc(d.githubAccount)}<br>Repository: <a href="${esc(d.github.repositoryUrl)}" target="_blank" rel="noopener">Open repository →</a><br>Branch: ${esc(d.github.branch)}<br>Files: ${d.project.fileCount}<br>Vercel project: ${esc(d.projectName)}<br>Commit: <a href="${esc(d.github.commitUrl)}" target="_blank" rel="noopener">Open commit →</a>${deploymentCard(d.vercel)}${warnings}`,'success');}catch(err){show('❌ Ship failed',err.message,'error');}finally{b.disabled=false;b.textContent='🚀 Create & Deploy';}};
-</script></body></html>
+function setStep(name,state){const el=document.querySelector(`[data-step="${name}"]`);if(!el)return;el.classList.remove('done','active');if(state)el.classList.add(state);}
+function resetSteps(){document.querySelectorAll('.step').forEach(x=>x.classList.remove('done','active'));}
+async function checkConnections(){
+  try{
+    const r=await fetch('/api/health'); const d=await r.json();
+    if(d.github?.connected){githubStatus.className='pill connected';githubStatus.textContent=`🟢 GitHub: ${d.github.account}`;}else{githubStatus.className='pill disconnected';githubStatus.textContent='⚪ GitHub unavailable';}
+    if(d.vercel?.connected){vercelStatus.className='pill connected';vercelStatus.textContent=`🟢 Vercel: ${d.vercel.username||d.vercel.name||'connected'}`;}else{vercelStatus.className='pill disconnected';vercelStatus.textContent='⚪ Vercel unavailable';}
+  }catch{githubStatus.textContent='⚪ GitHub unavailable';vercelStatus.textContent='⚪ Vercel unavailable';}
+}
+check.onclick=checkConnections;checkConnections();
+function deploymentCard(v){
+  const state=esc(v.state||'UNKNOWN');
+  let html=`<div class="detail"><b>Vercel</b><br>Project: ${esc(v.projectName||'')}<br>Status: <span class="${v.state==='READY'?'ok':'warn'}">${state}</span>`;
+  if(v.url)html+=`<div class="hero-url"><a href="${esc(v.url)}" target="_blank" rel="noopener">🌐 ${esc(v.url)}</a></div>`;
+  if(v.projectUrl)html+=`<a href="${esc(v.projectUrl)}" target="_blank" rel="noopener">Open Vercel project →</a>`;
+  if(v.inspectorUrl)html+=`<a href="${esc(v.inspectorUrl)}" target="_blank" rel="noopener">Open deployment details →</a>`;
+  return html+'</div>';
+}
+
+f.onsubmit=async e=>{
+  e.preventDefault();
+  if(!z.files.length)return;
+  b.disabled=true;b.textContent='⏳ Shipping…';progress.className='card status show';s.className='card status';resetSteps();
+  setStep('zip','active');
+  try{
+    const form=new FormData(f);
+    setStep('github','active');
+    const r=await fetch('/api/ship',{method:'POST',body:form});
+    const d=await r.json();
+    if(!r.ok||!d.ok){
+      let html=esc(d.error||'Ship failed.');
+      if(d.service)html+=`<div class="detail"><b>${esc(d.service)} API</b><br>HTTP: ${esc(d.status||'')}<br>Endpoint: ${esc(d.endpoint||'')}${d.details?`<br>Details: ${esc(d.details)}`:''}</div>`;
+      if(d.code==='GITHUB_REPO_CREATE_PERMISSION')html+=`<div class="detail"><span class="warn">GitHub fix:</span> use a token that can create repositories for the account.</div>`;
+      if(d.service==='Vercel')html+=`<div class="detail"><span class="warn">Vercel fix:</span> verify the Vercel token has permission to create projects/deploy and that the Vercel account can access the GitHub repository.</div>`;
+      throw Error(html);
+    }
+    ['zip','github','vercel-project','deploy','ready'].forEach(x=>setStep(x,'done'));
+    const warnings=d.project.warnings?.length?`<br><br><span class="warn">Warnings:</span><br>• ${d.project.warnings.map(esc).join('<br>• ')}`:'';
+    show('🎉 Project deployed',`GitHub account: ${esc(d.githubAccount)}<br>Repository: <a href="${esc(d.github.repositoryUrl)}" target="_blank" rel="noopener">Open repository →</a><br>Branch: ${esc(d.github.branch)}<br>Files: ${d.project.fileCount}<br>Commit: <a href="${esc(d.github.commitUrl)}" target="_blank" rel="noopener">Open commit →</a>${deploymentCard({...d.vercel,projectName:d.projectName})}${warnings}`,'success');
+  }catch(err){
+    setStep('zip','done');show('❌ Ship failed',err.message,'error');
+  }finally{b.disabled=false;b.textContent='🚀 Create & Deploy';}
+};
+</script>
+</body>
+</html>
